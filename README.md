@@ -1,6 +1,6 @@
 Here, you can find some projects I completed at university.
 
-1) [Numerical Methods using Python](https://hugoverissimo21.github.io/University-Projects/Py%20-%20numerical%20methods.pdf {:target="_blank"})
+1) [Numerical Methods using Python](https://hugoverissimo21.github.io/University-Projects/Py%20-%20numerical%20methods.pdf)
   
     -   QR Decomposition & Levenberg-Marquardt Method
     -   Comparative Analysis: Observed vs Estimated Data Graphics
