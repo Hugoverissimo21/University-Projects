@@ -1,0 +1,1020 @@
+---
+title: Trabalho R - AEII #\newline\large Subtitulo????
+author: Hugo Veríssimo 75695 \newline Mateus Botequilha 75521
+date: \today
+params:
+  logo: ./logo_ualg.png
+  cover: ./cover_v2.png
+  iblue: 2b4894
+  igray: d4dbde
+documentclass: article
+#fontsize: 10
+#papersize: a4paper
+output: 
+  IReports::businessReport:
+    keep_tex: TRUE
+    latex_engine: xelatex
+    resetStyleFiles: FALSE
+header-includes: 
+  - \newcommand{\logo}{`r gsub("_", "\\_", params$logo)`}
+  - \newcommand{\cover}{`r gsub("_", "\\_", params$cover)`}
+  - \newcommand{\iblue}{`r params$iblue`}
+  - \newcommand{\igray}{`r params$igray`}
+---
+
+```{r setup, include = FALSE}
+# packages
+library(dplyr)
+library(knitr)
+library(xtable)
+library(reticulate)
+
+# settings
+#knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+```
+
+\maketitle
+\tableofcontents
+\addcontentsline{toc}{section}{Índice}
+\clearpage
+
+$\ $
+
+\newpage
+
+\section{Introdução}
+
+No cenário atual da análise estatística, a utilização de ferramentas computacionais
+é fundamental para explorar, analisar e interpretar conjuntos de dados. Neste contexto,
+a linguagem de programação R destaca-se como uma ferramenta extremamente útil, ao
+oferecer uma enorme variedade de recursos, de modo a facilitar a realização de
+análises estatísticas.
+
+$\ $
+
+Assim sendo, este trabalho tem como intuito explorar a linguagem de programação
+referida, com foco principal direcionado para a compreensão das funcionalidades
+específicas do R no contexto de análises estatísticas, em particular, a sua aplicação
+nas técnicas de análise de variância e regressões lineares múltiplas.
+
+\newpage
+\section{Exercício 1}
+
+\textit{O conjunto de dados “penguins” do package “palmerpenguins” inclui medidas para
+três espécies de pinguins (Adélie, Chinstrap e Gentoo) da ilha no Arquipélago Palmer,
+relativas a comprimento das barbatanas, massa corporal, dimensões do bico e sexo. O
+conjunto de dados contém 8 variáveis para 344 pinguins.}
+
+```{r include=FALSE}
+#install.packages("palmerpenguins")
+#data(package = 'palmerpenguins')
+```
+```{r}
+library(palmerpenguins)
+penguins
+```
+
+No entanto, para este trabalho apenas nos interessam 3 variáveis: espécies (*species*),
+sexo (*sex*) e a massa corporal do pinguim em gramas (*body_mass_g*).
+
+Um problema que poderemos enfrentar ao analisar o conjunto de dados é
+o facto do mesmo ter valores em falta (NA) em algumas células, o que pode impactar
+a precisão e fiabilidade das análises.
+
+\subsection{Tratamento dos dados}
+
+De modo a simplificar o DataFrame e a dar a volta ao problema referido anteriormente,
+iremos criar um novo DataFrame (*peng_clean*) apenas com as colunas que iremos
+utilizar e remover do mesmo as linhas que contêm valores NA.
+
+Adicionalmente, também temos de verificar se as colunas estão prontas para ser utilizadas,
+isto é, dado que as colunas *species* e *sex* têm valores qualitativos, há que verificar
+se as mesmas são tratadas como fatores para o R. A coluna *body_mass_g* não terá qualquer
+problema dado que a mesma apenas contém valores quantitativos.
+
+```{r}
+# selecionar as colunas que queremos
+peng_clean <- penguins[, c("species", "sex", "body_mass_g")]
+
+# remover linhas com NA
+peng_clean <- na.omit(peng_clean)
+
+# verificar a classe das colunas
+cat(class(peng_clean$species), "&", class(peng_clean$sex))
+```
+
+Como se pode verificar, ambas as colunas são do tipo *factor*, ou seja, são tratadas
+como fatores, tal como era desejado. Ademais, também já selecionámos as colunas que
+serão utilizadas e removemos as linhas que continham NA, pelo que já podemos utilizar
+o nosso novo DataFrame.
+
+```{r}
+summary(peng_clean)
+peng_clean
+```
+
+\subsection{Verificação de pressupostos}
+
+Antes de avançarmos para a análise de variância, é essencial realizar a verificação
+dos pressupostos da ANOVA. Isto implica analisar a normalidade dos dados e dos resíduos,
+a independência dos dados e dos resíduos e, ainda, a homogeneidade das variâncias.
+
+A verificação destes pressupostos é fundamental para garantir a validade dos resultados
+obtidos na análise de variância, de modo a conseguirmos ter uma maior significância
+nas interpretações. Isto é, após confirmarmos que os mesmos se verificam, estaremos
+mais confiantes na robustez dos resultados que obtermos a partir da ANOVA.
+
+```{r}
+# anexar o DF ao environment 
+attach(peng_clean)
+
+# para podermos analisar o fator residuos
+npaov <- aov(formula = body_mass_g ~ species * sex, data = peng_clean)
+```
+
+\subsubsection{Normalidade dos resíduos e das observações}
+
+Primeiramente, vamos analisar a normalidade dos resíduos. Contudo, antes de realizarmos
+o teste formal para testar o pressuposto, decidimos adotar uma abordagem visual
+para obter uma primeira impressão da distribuição dos resíduos. Com este
+objetivo, vamos utilizar um gráfico *Quantile-Quantile* para comparar
+os quantis dos resíduos da amostra com os quantis de uma distribuição normal, e
+um histograma, de modo a comparar a distribuição dos resíduos da amostra com uma
+distribuição normal de média 0 e de variância igual à dos referidos.
+
+```{r}
+# mudar o layout grafico para o tipo i,j
+par(mfrow = c(1, 2))
+
+# grafico qq
+qqnorm(residuals(npaov))
+qqline(residuals(npaov))
+
+# histograma
+hist(residuals(npaov), probability = TRUE, ylab = "probability")
+xfit <- seq(min(residuals(npaov)), max(residuals(npaov)), length=100)
+yfit_residuals <- dnorm(xfit, mean=0, sd = sqrt(var(residuals(npaov))))
+lines(xfit, yfit_residuals, col = "black", lwd = 2)
+
+# voltar ao layout grafico normal
+par(mfrow = c(1, 1))
+```
+
+Como se pode observar em ambos os gráficos, os resíduos da amostra exibem uma
+grande proximidade em relação às linhas que representam a distribuição normal,
+pelo que será de esperar que os resíduos sigam uma distribuição normal.
+
+Para corroborar esta observação, de forma a obtermos uma validação mais formal da
+normalidade dos resíduos, devemos realizar o teste de normalidade de Shapiro-Wilk.
+$$
+H_0:\ Os\ residuos\ seguem\ uma\ distribuic\tilde{a}o\ normal\
+vs\
+H_1:\ Os\ residuos\ n\tilde{a}o\ seguem\ uma\ distribuic\tilde{a}o\ normal
+$$
+
+```{r}
+shapiro.test(residuals(npaov))
+```
+
+$p-value = 0.9367 > 0.05 = \alpha\ \Rightarrow\ $ não rejeitamos $H_0$ para o nível
+de significância de 5%, isto é, existe evidência estatística dos resíduos da amostra
+seguirem uma distribuição normal.
+
+$\ $
+
+Para além da análise da normalidade dos resíduos, também é importante testar a
+normalidade das observações. Com este propósito, devemos realizar testes de
+Shapiro-Wilk entre cada grupo de observações, ou seja, um teste para cada combinação
+entre *species* e *sex*, dado que são estas as variáveis explicativas.
+$$ H_0:\ O\ grupo_{species,sex}\ segue\ uma\ distribuic\tilde{a}o\ normal$$
+$$ H_1:\ O\ grupo_{species,sex}\ n\tilde{a}o\ segue\ uma\ distribuic\tilde{a}o\ normal$$
+```{r}
+aggregate(body_mass_g ~ species * sex, data = peng_clean,
+          function(x) shapiro.test(x)$p.value)
+```
+
+$min\{p-value_{species,sex}\} \approx 0.1985 > 0.05 = \alpha\ \Rightarrow\ $ não
+rejeitamos nenhum dos $H_0$ para o nível de significância de 5%, isto é, existe
+evidência estatística de que todos os grupos seguem uma distribuição normal.
+
+$\ $
+
+Desta forma, após termos analisado os resultados dos testes de Shapiro-Wilk, podemos
+concluir que tanto os resíduos como as observações seguem distribuições normais, pelo
+que esta constatação valida a pressuposição de normalidade.
+
+\subsubsection{Independência dos resíduos}
+
+Após a análise do pressuposto da normalidade, devemos analisar a
+validade do pressuposto da independência, isto é, devemos agora verificar se
+os resíduos são independentes entre si. Com este objetivo, vamos analisar a independência
+resíduos através de uma abordagem visual.
+
+```{r}
+plot(residuals(npaov), ylab = "Residuals", xlab = "Observation Index",
+     main = "Residuals Plot for ANOVA")
+```
+
+Através da visualização do gráfico dos resíduos, podemos verificar que não existe
+qualquer padrão entre os mesmos, mas sim uma distribuição aleatória entre eles,
+ao longo do eixo horizontal, o que nos permite concluir que há independência dos
+resíduos, ou seja, verifica-se o pressuposto.
+
+\subsubsection{Homogeneidade das variâncias}
+
+Atendendo ao pressuposto que nos falta verificar, a homogeneidade das variâncias,
+este pode ser analisado de forma gráfica, através da análise da relação entre os
+resíduos e os valores ajustados, e também através da realização de um teste estatístico,
+o teste de Bartlett.
+
+Comecemos pela forma gráfica.
+
+```{r}
+par(mfrow = c(1, 2))
+
+# dispersao entre valores ajustados e residuos
+plot(fitted(npaov), residuals(npaov), col = "darkgray", pch = 10)
+# linha que melhor se ajusta aos padroes dos residuos
+lines(lowess(residuals(npaov) ~ fitted(npaov)), col = "black")
+
+# aplicar transformacao logaritmica para tornar padroes mais evidentes
+log_resid <- log1p(abs(residuals(npaov)))
+plot(fitted(npaov), log_resid, col = "darkgray", pch = 10)
+lines(lowess(log_resid ~ fitted(npaov)), col = "black")
+
+par(mfrow = c(1, 1))
+```
+
+Pelo facto da linha que melhor se ajusta à dispersão dos resíduos ser significativamente
+horizontal, pode-se verificar que a dispersão dos mesmos é constante, pelo que
+o pressuposto da homogeneidade de variâncias se verifica.
+
+De qualquer forma, analisemos agora o pressuposto, novamente, mas através do teste
+de Bartlett.
+
+```{r}
+detach(peng_clean)
+# introduzir coluna nova do tipo "species.sex" (ex.: Gentoo.female)
+peng_clean$bart <- interaction(peng_clean$species, peng_clean$sex)
+attach(peng_clean)
+
+summary(bart)
+```
+
+Note-se que todos os grupos têm pelo menos 5 observações, pelo que os resultados
+serão mais significantes, dada a sensibilidade deste teste ao tamanho das amostras.
+Avancemos com o teste.
+$$
+H_0:\ \exists\ homogeneidade\ de\ vari\hat{a}ncias\
+vs\
+H_1:\ \nexists\ existe\ homogeneidade\ de \ vari\hat{a}ncias
+$$
+
+```{r}
+bartlett.test(body_mass_g ~ bart, data = peng_clean)
+```
+
+$p-value = 0.1741 > 0.05 = \alpha\ \Rightarrow\ $ não rejeitamos $H_0$ para o nível
+de significância de 5%, isto é, existe evidência estatística de não haverem diferenças
+significativas entre as variâncias de diferentes grupos. Assim, verifica-se o
+pressuposto da homogeneidade das variâncias, tal como já havíamos verificado anteriormente.
+
+```{r}
+detach(peng_clean)
+```
+
+Em suma, tendo por base as análises realizadas, verificamos que os dados atendem
+aos pressupostos desejados, o que fortalece a validade estatística dos próprios,
+estabelecendo uma base sólida e confiável para a interpretação dos resultados subsequentes
+da análise de variância, assegurando a robustez e a precisão das conclusões extraídas
+a partir desse estudo.
+
+\subsection{Análise descritiva dos dados}
+
+Realizada a verificação dos pressupostos para o nosso conjunto de dados,
+estamos prontos para realizar uma análise descritiva. Isto implica calcular as médias
+por variável (*species* e *sex*) e por grupo formado pela combinação das mesmas
+(*species.sex*), o que nos irá permitir ter uma perceção dos resultados que devemos
+esperar ao realizar a análise de variância. Para além do cálculo das médias,
+também podemos criar gráficos de interação, de modo a observar a presença, ou não,
+de interação entre os fatores.
+
+$\ $
+
+Comecemos pelo cálculo das médias por variável, mas ao invés de nos restringirmos
+a números, exploremos visualmente as mesmas.
+
+```{r}
+attach(peng_clean)
+par(mfrow = c(1, 2))
+
+# media species e sex, atraves de caixas de bigodes
+plot(species, body_mass_g, ylab = "body_mass_g", xlab = "species", cex.axis = 0.7)
+plot(sex, body_mass_g, ylab = "body_mass_g", xlab = "sex", cex.axis = 0.7)
+
+par(mfrow = c(1, 1))
+```
+
+Note-se que apenas não há diferenças significativas entre as médias das espécies Adelie
+e Chinstrap, pelo que será de esperar que rejeitemos a hipótese de haver igualdade
+entre as médias tanto na variável *species*, como na variável *sex*.
+
+$\ $
+
+Analisemos agora as médias entre os grupos formados por cada tipo de *species* e *sex*.
+
+```{r}
+# media species.sex
+aggregate(body_mass_g ~ species * sex, data = peng_clean, FUN = mean)
+```
+
+Como podemos verificar, a análise das diferenças entre as médias de forma numérica
+é mais trabalhosa do que através de representações gráficas. Contudo, podemos, ainda
+assim, observar que apenas há proximidade nas médias entre as espécies Adelie e
+Chinstrap, quando ambos são ou machos ou fêmeas.
+
+$\ $
+
+No que diz respeito à interação entre os fatores, procederemos à criação de
+gráficos de interação para verificar a existência, ou não, da mesma, tal como referido.
+
+```{r}
+par(mfrow = c(1, 2))
+# mudar tamanho da fonte (lab, axis, tudo) em %
+par(cex.lab = 1.3, cex.axis = 1.3, cex=0.6)
+
+# fazer os graficos de interacao
+with(peng_clean, interaction.plot(species, sex, body_mass_g,
+                           type = "b", pch = 19, fixed = T,
+                           xlab = "species", ylab = "media body_mass_g", legend = FALSE))
+legend("bottomright", legend = c("female", "male"),
+       title = "species", lty = c(2,1), pch = 19)
+
+with(peng_clean, interaction.plot(sex, species, body_mass_g,
+                                  type = "b", pch = 19, fixed = T,
+                                  xlab = "sex", ylab = "media body_mass_g", legend = FALSE))
+legend("bottomright", legend = c("Adelie", "Chinstrap", "Gentoo"),
+       title = "sex", lty = c(3,2,1), pch = 19)
+
+par(mfrow = c(1, 1))
+detach(peng_clean)
+```
+
+Como podemos observar, no primeiro gráfico, há falta de paralelismo. O mesmo se
+passa no segundo gráfico, de forma ainda mais evidente, pelo facto de haver interseção
+de duas retas. Estas observações indicam-nos que haverá interação entre os fatores.
+
+\subsection{Análise de variância (ANOVA)}
+
+Finalmente, após o tratamento dos dados, a verificação dos pressupostos e uma breve
+análise descritiva, podemos realizar a análise de variância (ANOVA). Esta análise
+permite-nos testar as seguintes hipóteses:
+
+\begin{itemize}
+  \item $H_0':\ \mu_{Adelie}=\mu_{Chinstrap}=\mu_{Gentoo}=\mu\ vs\ H_1':\ \exists_{i}:\  \mu_{i} \neq \mu$
+
+  \item $H_0'':\ \mu_{female}=\mu_{male}=\mu\ vs\ H_1'':\ \exists_{j}:\  \mu_{j} \neq \mu$
+
+  \item $H_0''':\ \nexists\ interac\tilde{a}o\ entre\ os\ fatores\ species\ e\ sex\ vs\ H_1''':\ \exists\ interac\tilde{a}o\ entre\ os\ fatores\ species\ e\ sex$
+\end{itemize}
+
+```{r}
+summary(npaov)
+```
+
+Comecemos por analisar a interação entre os fatores:
+
+$p-value = 0.000197 < 0.05 = \alpha\ \Rightarrow\ $ rejeitamos $H_0'''$ para o nível
+de significância de 5%, isto é, existe evidência estatística de haver interação
+significativa entre os fatores *species* e *sex*, tal como já havíamos previsto
+na análise descritiva.
+
+$\ $
+
+De seguida, analisemos os níveis médios do fator *species*:
+
+$p-value < 2e-16 < 0.05 = \alpha\ \Rightarrow\ $ rejeitamos $H_0'$ para o nível
+de significância de 5%, isto é, existe evidência estatística de haver diferenças
+significativas entre o peso médio dos pinguins para os níveis do fator *species*,
+quando considerados relativamente aos níveis do fator *sex*, em média.
+
+$\ $
+
+E por último, analisemos os níveis médios do fator *sex*:
+
+$p-value < 2e-16 < 0.05 = \alpha\ \Rightarrow\ $ rejeitamos $H_0''$ para o nível
+de significância de 5%, isto é, existe evidência estatística de haver diferenças
+significativas entre o peso médio dos pinguins para os níveis do fator *sex*,
+quando considerados relativamente aos níveis do fator *species*, em média.
+
+$\ $
+
+Pelo facto de termos verificado que existem diferenças entre o peso médio dos pinguins,
+tanto para os níveis do fator *species*, como para os níveis do fator *sex*, tal como
+era de esperar, tendo em conta as conclusões tiradas a partir da análise descritiva,
+temos agora de averiguar que grupos (*species:sex*, dado que os fatores têm interação)
+têm, ou não, médias significativamente diferentes. Para realizar estas comparações
+múltiplas iremos utilizar o teste de Tukey, tanto numérica como graficamente.
+$$
+H_0:\ \mu_{species_i,sex_i}=\mu_{species_j,sex_j}\
+vs\
+H_1:\ \mu_{species_i,sex_i}\neq\mu_{species_j,sex_j}
+$$
+
+```{r}
+TukeyHSD(npaov, "species:sex")
+```
+
+Tendo em conta o teste de Tukey realizado, podemos reparar que apenas as combinações
+\textit{Chinstrap:female-Adelie:female} e \textit{Chinstrap:male−Adelie:male} têm
+p-values superiores a 0.05 (0.1376213 e 0.5812048, respetivamente), pelo que as
+restantes combinações de grupos rejeitam $H_0$, mas estas não. Isto significa que
+para um nível de significância
+de 5%, existe evidência estatística de que os pinguins fêmea das espécies Chinstrap e
+Adelie não têm diferenças significativas no seu peso médio, tal como os pinguins machos
+das mesmas espécies, e de que os pesos médios dos restantes grupos de pinguins
+(*species:sex*) têm todos diferenças significativas entre si.
+
+```{r}
+# alterar as margens (baixo, esqueda, cima, direita)
+par(mar = c(4, 9, 2, 0))
+plot(TukeyHSD(npaov, "species:sex"), cex.axis = 0.6, las = 1)
+```
+
+Através da análise do gráfico, chegamos às mesmas conclusões mencionadas anteriormente.
+As combinações que incluem o valor zero no seu intervalo são aquelas que provam estatisticamente
+a ausência de diferenças significativas entre os pesos médios entre os grupos de pinguins a
+serem comparados. Isto é, as combinações que contêm o valor zero no seu intervalo, são aquelas
+que não rejeitam a hipótese nula ($H_0$) definida anteriormente, enquanto que as restantes
+a rejeitam.
+
+$\ $
+
+Note-se que todas as conclusões derivadas da análise de variância já haviam sido
+antecipadas durante a análise descritiva, evidenciando, desta forma, concordância
+entre as previsões e as conclusões, como seria de esperar.
+
+\newpage
+\section{Exercício 2}
+
+\textit{O conjunto de dados “sat” do package “faraway” foi obtido com o objetivo de estudar
+a relação entre as despesas dos alunos com a educação no ensino público e os resultados
+obtidos no exame SAT.}
+
+```{r}
+library(faraway)
+head(sat, 12)
+```
+
+O conjunto de dados contém 7 variáveis relativas aos resultados de 50 alunos. No
+entanto, para a nossa regressão linear múltipla, apenas iremos considerar as variáveis
+despesas (*expend*), razão média de alunos por professor (*ratio*), ordenado (*salary*),
+percentagem de alunos elegíveis para fazerem o exame (*takers*) e pontuação média total
+no SAT (*total*).
+
+Para simplificar o conjunto de dados, podemos criar um novo DataFrame, apenas com as
+variáveis necessárias.
+
+```{r}
+sat_clean <- sat[, c("total", "expend", "ratio", "salary", "takers")]
+head(sat_clean, 12)
+```
+
+\subsection{Estimação do modelo de regressão linear múltipla}
+
+Após termos selecionado as variáveis que vamos utilizar, podemos agora construir
+o nosso modelo de regressão linear múltipla, o que nos irá permitir explorar a
+relação entre as variáveis explicativas (*expend*, *ratio*, *salary*, *takers*) e
+a variável dependente (*total*).
+
+```{r}
+# criar o modelo de regressao linear
+sat_lm <- lm(total ~ expend + ratio + salary + takers, data = sat_clean)
+sat_lm
+```
+
+Estimado o modelo, devemos analisar os coeficientes, ou seja, vamos verificar
+o impacto de cada variável explicativa na variável dependente e analisar o que
+significa esse impacto no contexto dos nossos dados.
+
+\begin{itemize}
+  \item $\beta_0:$ Estima-se que se todas as variáveis explicativas (\textit{expend},
+\textit{ratio}, \textit{salary} e \textit{takers}) forem nulas, então a pontuação
+média total no SAT (\textit{total}) será de 1045.9715 unidades.
+  
+  \item $\beta_{expend}:$ Estima-se que por cada variação unitária nas despesas
+(\textit{expend}), a pontuação média total no SAT (\textit{total}) varie 4.4626 unidades,
+assumindo tudo o resto constante.
+  
+  \item $\beta_{ratio}:$ Estima-se que por cada variação unitária na razão média
+de alunos por professor (\textit{ratio}), a pontuação média total no SAT
+(\textit{total}) varie -3.6242 unidades, assumindo tudo o resto constante.
+  
+  \item $\beta_{salary}:$ Estima-se que por cada variação unitária no ordenado
+(\textit{salary}), a pontuação média total no SAT (\textit{total}) varie 1.6379 unidades,
+assumindo tudo o resto constante.
+  
+  \item $\beta_{takers}:$ Estima-se que por cada variação unitária na percentagem
+de alunos elegíveis para fazerem o exame (\textit{takers}), a pontuação média total
+no SAT (\textit{total}) varie -2.9045 unidades, assumindo tudo o resto constante.
+\end{itemize}
+
+\subsection{Interpretação do modelo estimado}
+
+Tendo em conta o modelo de regressão estimado, através da análise do mesmo, para 
+além de podermos interpretar os coeficientes, tal como fizemos, podemos interpretar
+outros valores, o que nos irá permitir tirar outras conlusões sobre o modelo.
+
+```{r}
+summary(sat_lm)
+```
+
+Comecemos por analisar os resultados presentes sobre os testes de significância
+individuais:
+$$
+H_0:\ \beta_i=0\
+vs\
+H_1:\ \beta_i \neq 0
+$$
+
+\begin{itemize}
+  \item $\beta_{expend}:$ $p-value = 0.674 > 0.05 = \alpha\ \Rightarrow\ $ não
+rejeitamos $H_0$ para o nível de significância de 5\%, isto é, existe envidência
+estatística de que a variável \textit{expend} não é significativa para o modelo
+que inclui as variáveis \textit{ratio}, \textit{salary} e \textit{takers}.
+  
+  \item $\beta_{ratio}:$ $p-value = 0.266 > 0.05 = \alpha\ \Rightarrow\ $ não
+rejeitamos $H_0$ para o nível de significância de 5\%, isto é, existe envidência
+estatística de que a variável \textit{ratio} não é significativa para o modelo
+que inclui as variáveis \textit{expend}, \textit{salary} e \textit{takers}.
+  
+  \item $\beta_{salary}:$ $p-value = 0.496 > 0.05 = \alpha\ \Rightarrow\ $ não
+rejeitamos $H_0$ para o nível de significância de 5\%, isto é, existe envidência
+estatística de que a variável \textit{salary} não é significativa para o modelo
+que inclui as variáveis \textit{expend}, \textit{ratio} e \textit{takers}.
+  
+  \item $\beta_{takers}:$ $p-value = 2.61e-16 < 0.05 = \alpha\ \Rightarrow\ $ rejeitamos
+$H_0$ para o nível de significância de 5\%, isto é, existe envidência estatística de que
+a variável \textit{takers} é significativa para o modelo que inclui as variáveis
+\textit{expend}, \textit{ratio} e \textit{salary}.
+  
+\end{itemize}
+
+$\ $
+
+De seguida, podemos verificar que *Adjusted R-squared:  0.809*, o que nos
+indica que aproximadamente 81% da variação da pontuação média total no SAT (*total*),
+pode ser explicada pelo modelo estimado.
+
+$\ $
+
+Por último, também é de elevada importância avaliar a significância do modelo de
+regressão linear múltipla estimado:
+$$
+H_0:\ \beta_0=\beta_{expend}=\beta_{ratio}=\beta_{salary}=\beta_{takers}=0\
+vs\
+H_1:\ \exists_i:\beta_i \neq 0
+$$
+
+$p-value < 2.2e-16 < 0.05 = \alpha\ \Rightarrow\ $ rejeitamos $H_0$ para o nível
+de significância de 5%, isto é, existe evidência estatística de que o modelo
+ajustado é significativo, ou seja, pelo menos uma das variáveis explicativas tem
+um efeito significativo sobre a variável dependente.
+
+\subsection{Análise de resíduos}
+
+Antes de mais, devemos avaliar determinadas suposições sobre o nosso conjunto de
+dados, ver se as mesmas se verificam. Se as suposições da regressão se mantiverem,
+os resíduos deverão ser normalmente distribuídos, com valor médio zero e variância
+constante e independentes entre si.
+
+$\ $
+
+Comecemos por verificar se são normalmente distribuídos:
+
+```{r}
+par(mfrow = c(1,2))
+
+# grafico qq
+qqnorm(residuals(sat_lm))
+qqline(residuals(sat_lm))
+
+# histograma
+hist(residuals(sat_lm), probability = TRUE, ylab = "probability")
+xfit <- seq(min(residuals(sat_lm)), max(residuals(sat_lm)), length = 150)
+yfit_residuals <- dnorm(xfit, mean = 0, sd = sqrt(var(residuals(sat_lm))))
+lines(xfit, yfit_residuals, col = "black",lwd = 2)
+```
+
+$$
+H_0:\ Os\ residuos\ seguem\ uma\ distribuic\tilde{a}o\ normal\
+vs\
+H_1:\ Os\ residuos\ n\tilde{a}o\ seguem\ uma\ distribuic\tilde{a}o\ normal
+$$
+
+```{r}
+par(mfrow = c(1,1))
+
+# teste de Shapiro–Wilk
+shapiro.test(residuals(sat_lm))
+```
+
+$p-value = 0.4304 > 0.05 = \alpha\ \Rightarrow\ $ não rejeitamos $H_0$ para o nível
+de significância de 5%, isto é, existe evidência estatística de que os resíduos
+seguem uma distribuição normal.
+
+Tendo em conta as representações gráficas, as mesmas reforçam a não rejeição de
+$H_0$, pelo facto dos resíduos exibirem uma grande proximidade às linhas que representam
+a distribuição normal, em cada um dos gráficos.
+
+$\ $
+
+Verifiquemos se o valor médio é zero e a variância constante:
+
+```{r}
+par(mfrow = c(1,2))
+
+# valor medio
+boxplot(residuals(sat_lm), main = "Residuals Scatter Plot",
+     xlab = "Observation", ylab = "Residuals")
+abline(h = 0, col = "black", lty = 2)
+
+# homogeneidade de variancia
+plot(fitted(sat_lm), rstandard(sat_lm),
+     main = "Standardized residuals vs Fitted")
+abline(h = 0, col = "black", lty = 2)
+
+par(mfrow = c(1,1))
+```
+
+Repare-se que no primeiro gráfico podemos observar que a média dos resíduos está
+muito próxima de zero, pelo que podemos afirmar que o valor médio é zero. Para além
+disso, se recuarmos aos testes da normalidade, podemos verificar no histograma que
+a linha com que os resíduos têm uma grande proximidade representa uma distribuição
+normal de valor médio zero, pelo que essa verificação já estava prevista.
+
+Atendendo ao segundo gráfico, pelo facto dos pontos aparentarem estar distribuídos
+de forma aleatória, em redor da linha horizonal que representa o zero, temos a
+verificação de que estamos perante uma variância constante.
+
+$\ $
+
+Analisemos, por fim, a independência:
+
+```{r}
+# carregar os pacotes, sem aviso de conflito
+library(zoo, warn.conflicts = FALSE)
+library(lmtest)
+```
+
+$$
+H_0:\ \nexists\ autocorrelac\tilde{a}o\ nos\ residuos\
+vs\
+H_1:\ \exists\ autocorrelac\tilde{a}o\ nos\ residuos\
+$$
+
+```{r}
+# teste de Durbin-Watson
+dwtest(sat_lm)
+```
+
+$p-value = 0.9459 > 0.05 = \alpha\ \Rightarrow\ $ não rejeitamos $H_0$ para o nível
+de significância de 5%, isto é, existe evidência estatística de que não há autocorrelação
+nos resíduos, ou seja, há independência entre eles.
+
+$\ $
+
+Podemos assim concluir, através das representações gráficas e dos testes estatísticos
+realizados, que as suposições da regressão linear múltipla se mantêm, pelo que o modelo
+parece ser apropriado para explicar a relação entre as variáveis consideradas.
+
+\subsection{Otimização do modelo: regressão stepwise}
+
+Contudo, nada nos indica que o modelo que estimámos seja o "melhor" para explicar a
+pontuação média total no SAT (*total*). Para testar se existe um modelo "melhor",
+ou seja, um modelo que equilibre mais adequadamente a sua complexidade e a explicação
+da variabilidade da variável dependente, vamos utilizar a função *step* (*stepwise*).
+
+Ademais, devemos notar que a regressão *stepwise*, dependendo do modelo inicial e
+da direção escolhida, pode diferir. Assim sendo, devemos partir de dois modelos
+diferentes e comparar as regressões obtidas, pelo que optámos por partir de um
+modelo explicado por todas as nossas variáveis ($expend + ratio + salary + takers$)
+e de um modelo sem variáveis explicativas ($1$). Observemos o que acontece.
+
+```{r}
+# definir os modelos
+min.model <- lm(total ~ 1, data = sat_clean)
+max.model <- sat_lm
+
+# comeca com tudo mas pode tirar e meter
+sat_lm_step.max <- step(max.model, direction = "both")
+
+# comeca sem nada mas pode meter e tirar
+sat_lm_step.min <- step(min.model, direction = "both", scope = formula(max.model))
+```
+
+Ao observarmos os resultados das regressões *stepwise*, verificamos que a escolha
+do modelo inicial teve impacto no modelo final obtido. Por conseguinte, vamos
+criar um DataFrame para melhor comparar os dois modelos estimados ao nosso modelo
+anterior.
+
+```{r}
+sat.lm<- c(extractAIC(sat_lm),
+              summary(sat_lm)$adj.r.squared)
+step.max <- c(extractAIC(sat_lm_step.max),
+              summary(sat_lm_step.max)$adj.r.squared)
+step.min <- c(extractAIC(sat_lm_step.min),
+              summary(sat_lm_step.min)$adj.r.squared)
+step_comparacao <- data.frame(sat.lm, step.max, step.min)
+rownames(step_comparacao) <- c("Parameters","AIC","Adj. R^2")
+step_comparacao
+```
+
+Através da análise do DataFrame criado, podemos verificar que, em relação ao modelo
+anterior, os dois novos modelos estimados têm menos parâmetros a estimar, um menor
+AIC e uma melhor explicação sobre a variação da variável *total*.
+
+Comparando os dois novos modelos, verificamos que o modelo *step.min*, para além
+de ter menos parâmetros a estimar e um menor AIC, explica aproximadamente 81.2%
+da variação da variável *total*, tal como o modelo *step.max*.
+
+Desta forma, podemos concluir que o modelo mais adequado para explicar a pontuação
+média total no SAT (*total*) é o seguinte:
+
+```{r}
+sat_lm.step <- sat_lm_step.min
+sat_lm.step
+```
+
+\subsection{Confirmação do modelo ótimo: testes F-parciais}
+
+Uma vez obtido o novo modelo, através do método *stepwise*, podemos confirmar as
+escolhas das variáveis incluídas no mesmo, através de testes F-parciais. A realização
+de testes F-parciais vai-nos permitir avaliar se a inclusão de variáveis específicas
+no modelo melhora significativamente a explicação da variabilidade da variável dependente,
+ou não.
+
+De modo a facilitar a realização dos testes F-parciais, vamos criar uma função
+que os realize entre um modelo inicial e vários modelos com apenas mais uma
+variável que o inicial e, de seguida, apresente o p-value associado a cada um
+dos testes.
+
+```{r}
+testes_f_parcial <- function(formula_0, variaveis) {
+  # modelo inicial
+  modelo_0 <- lm(as.formula(formula_0), data = sat_clean)
+  
+  # fazer anova com a adicao de cada variavel
+  resultados_anova <- lapply(variaveis, function(x) {
+    formula_i <- paste(formula_0, "+", x)
+    modelo_i <- lm(as.formula(formula_i), data = sat_clean)
+    anova(modelo_0, modelo_i)})
+  
+  # selecionar os p-values
+  p_values <- sapply(resultados_anova, function(resultado) resultado$"Pr(>F)"[2])
+  
+  # criar dataframe para melhorar a visualizacao
+  df <- t(p_values)
+  colnames(df) <- variaveis
+  rownames(df) <- c("p-values")
+  
+  return(df)
+}
+```
+
+Note-se que os testes têm as seguintes hipóteses associadas:
+$$
+H_0:\ A\ vari\acute{a}vel\ x_i\ n\tilde{a}o\ \acute{e}\ significativa\ para\ o\ modelo\
+vs\
+H_1:\ A\ vari\acute{a}vel\ x_i\ \acute{e}\ significativa\ para\ o\ modelo
+$$
+
+Comecemos com um modelo inicial sem variáveis explicativas e comparemos com os
+modelos que contêm cada uma destas.
+
+```{r}
+testes_f_parcial("total ~ 1", c("expend", "salary", "ratio", "takers"))
+```
+
+Como podemos observar, os p-values associados às variáveis *expend*, *salary* e
+*takers* são menores que 5%, o nosso nível de significância, pelo que rejeitamos
+os $H_0$ associados a estas variáveis. Isto é, existe evidência estatística de que
+cada uma destas variáveis é significativa para o seu modelo.
+
+Contudo, como o menor p-value é o associado à variável *takers*, vamos realizar
+novamente os testes F-parciais, mas desta vez adicionando a variável *takers* ao
+modelo incial e comparemos com os modelos idênticos a este, mas com a adição de
+cada uma das restantes variáveis.
+
+```{r}
+testes_f_parcial("total ~ takers", c("expend", "salary", "ratio"))
+```
+
+Analogamente, adicionemos agora a variável *expend*.
+
+```{r}
+testes_f_parcial("total ~ takers + expend", c("salary", "ratio"))
+```
+
+$min\{p-values\} \approx 0.3629 > 0.05 = \alpha\ \Rightarrow\ $ não rejeitamos
+nenhum dos $H_0$ para o nível de significância de 5%, isto é, existe evidência
+estatística de que o modelo mais simples, ou seja, aquele que só tem como variáveis
+explicativas as variáveis *takers* e *expend*, é suficiente para explicar a variável
+dependente (*total*).
+
+Com isto, podemos reparar que o "melhor" modelo obtido, tendo por base os critérios
+utilizados nestes testes F-parciais, é idêntico ao "melhor" modelo obtido através
+do método *stepwise*, o que reforça a validade e consistência do modelo estimado.
+
+\subsection{Análise do modelo ótimo}
+
+Por fim, analisemos o modelo de regressão linear múltipla que obtemos através da
+otimização do modelo inicial.
+
+$\ $
+
+Comecemos por analisar as variáveis do modelo:
+
+```{r}
+summary(sat_lm.step)$call
+
+summary(sat_lm.step)$coefficients
+```
+
+Podemos observar que o modelo, como vimos anteriormente, tem como variáveis
+explicativas as despesas (*expend*) e a percentagem de alunos elegíveis para fazerem o
+exame (*takers*) e como variável dependente a pontuação média total no SAT (*total*).
+
+Para além disso, podemos observar que os coeficientes $\beta_0$, $\beta_{takers}$ e
+$\beta_{expend}$ são agora, aproximadamente, 993.83, -2.85 e 12.29, respetivamente,
+e que $max\{p-value\} \approx 5.53e-03 < 0.05 = \alpha\ \Rightarrow\ $ para um nível
+de significância de 5%, existe evidência estatística de que cada uma das variáveis
+é significativa para o modelo.
+
+$\ $
+
+Verifiquemos agora a significância do modelo através do cálculo do p-value, ao
+invés da sua observação direta, com o objetivo de explorar mais funções do R:
+$$
+H_0:\ \beta_0=\beta_{takers}=\beta_{expend}=0\
+vs\
+H_1:\ \exists_i:\beta_i \neq 0
+$$
+
+```{r}
+fstatistic_value <- summary(sat_lm.step)$fstatistic[1] # = 106.7
+fstatistic_numdf <- summary(sat_lm.step)$fstatistic[2] # = 2
+fstatistic_dendf <- summary(sat_lm.step)$fstatistic[3] # = 47
+
+pf(fstatistic_value, fstatistic_numdf, fstatistic_dendf, lower.tail = FALSE)
+```
+
+$p-value = 3.378819e-18 < 0.05 = \alpha\ \Rightarrow\ $ rejeitamos $H_0$ para o nível
+de significância de 5%, isto é, existe evidência estatística de que o modelo
+ajustado é significativo, ou seja, pelo menos uma das variáveis explicativas tem
+um efeito significativo sobre a variável dependente.
+
+$\ $
+
+De seguida, criemos gráficos de resíduos *vs* fatores, com o objetivo de observar se
+existem, ou não, padrões na dispersão dos resíduos, consoante a variável explicativa.
+
+```{r}
+par(mfrow = c(1, 2))
+
+# residuos vs takers
+plot(sat_clean$takers, residuals(sat_lm.step), 
+     xlab = "takers", ylab = "Residuals",
+     main = "Residuals vs takers")
+
+# residuos vs expend
+plot(sat_clean$expend, residuals(sat_lm.step), 
+     xlab = "expend", ylab = "Residuals",
+     main = "Residuals vs expend")
+
+par(mfrow = c(1, 1))
+```
+
+Verifica-se a inexistência de padrões na distribuição dos resíduos, o que nos sugere
+que o modelo consegue explicar as variações da variável dependente de forma consistente,
+ao longo dos diferentes níveis dos fatores.
+
+$\ $
+
+Relembremos que é de elevada importância a verificação de certas condições para
+que o modelo seja aplicável e que os seus resultados possam ser interpretados de
+maneira significativa. Verifiquemos as seguintes condições:
+
+```{r, fig.height = 9.5}
+library(performance, warn.conflicts = FALSE)
+check_model(sat_lm.step)
+```
+
+*Posterior Predictive Check*: podemos verificar que não existem discrepâncias
+significativas entre os dados reais e os simulados, pelo que podemos afirmar que
+o modelo se ajusta bem aos dados.
+
+*Linearity*: devemos notar que a linha que melhor se ajusta aos pontos não é
+completamente horizontal, mas também não se assemelha significativamente a um "U".
+Isto indica-nos que a relação entre as variáveis pode não ser linear.
+
+*Homogeneity of Variance*: notemos que a linha é aproximadamente horizontal, pelo
+que será expectável que haja homogeneidade de variâncias.
+
+*Influential Observations*: verifiquemos que os pontos estão todos dentro das linhas
+a tracejado, pelo que as distâncias de Cook (analisam o impacto de cada ponto de
+dados na estimação dos coeficientes do modelo de regressão, o que acaba por ser
+uma verificação de outliers) são respeitadas.
+
+*Collinearity*: podemos verificar que o VIF é baixo para ambas as variáveis, o que
+nos indica que não há correlação significativa entre elas.
+
+*Normality of Residuals*: notemos que os pontos, de forma significativa, alinham-se
+ao longo da linha horizontal, o que nos permite afirmar que os resíduos têm uma
+distribuição normal.
+
+$\ $
+
+Para finalizar, vamos criar um gráfico 3D que compare os valores estimados pelo modelo
+de regressão linear estimado, face aos valores reais do conjunto de dados.
+
+```{r}
+library(scatterplot3d)
+
+x_min <- min(sat_clean$takers) * 0.9
+x_max <- max(sat_clean$takers) * 1.1
+y_min <- min(sat_clean$expend) * 0.9
+y_max <- max(sat_clean$expend) * 1.1
+
+predictions <- predict(sat_lm.step,
+                       newdata = data.frame(takers = c(x_min, x_max),
+                                            expend = c(y_min, y_max)))
+
+sat_lm.graph <- scatterplot3d(c(x_min,x_max), c(y_min,y_max), predictions,
+                     color = "black", type = "l", angle = 30,
+                     xlab = "takers", ylab = "expend", zlab = "total",
+                     zlim = c(min(sat_clean$total)*0.9, max(sat_clean$total)*1.1),
+                     main = "Regressão sat_lm.step", cex.axis = 0.6)
+
+sat_lm.graph$points3d(sat_clean$takers, sat_clean$expend, sat_clean$total,
+             col = "darkgray", type = "p")
+```
+
+\newpage
+\section{Conclusão}
+
+A realização deste trabalho deu-nos a oportunidade de explorar mais aprofundadamente
+as linguagens Rmarkdown e R, tal como o software RStudio. Ademais, através
+da utlização do R, conseguimos percecionar, em primeira mão, a grande assistência
+que o mesmo oferece durante a análise de conjuntos de dados, revelando-se
+particularmente crucial no contexo estatístico.
+
+$\ $
+
+No âmbito específico da análise de variância, o R destaca-se pela sua capacidade
+de realizar uma avaliação abrangente das diferenças entre grupos. Além de identificar
+variações significativas entre médias, o R disponibiliza ferramentas integradas para
+a verificação de pressupostos essencias, tanto de forma numérica como visual, reforçando
+a validação dos resultados obtidos na análise de variância.
+
+$\ $
+
+Quanto à regressão linear múltipla, a linguagem de programação permite-nos explorar
+relações entre variáveis, identificar padrões, testar pressupostos sobre as observações
+e, ainda, comparar diferentes modelos explicativos, o que inclui a flexiblidade para
+combinar diferentes conjuntos de variáveis explicativas, possiblitando a identificação
+do modelo que melhor se adequa ao conjunto de dados.
+
+$\ $
+
+Em suma, este trabalho não apenas aprofundou o nosso conhecimento estatístico, como
+também ressaltou a importância da utlização de ferramentas computacionais no âmbito
+da análise estatística.
+
+<!--
+BOT
+Em resumo, este trabalho não apenas aprofundou nosso conhecimento em ferramentas estatísticas específicas, mas também ressaltou a importância da linguagem R na análise de dados, fornecendo insights valiosos para futuras investigações e aplicações práticas.
+
+INTRODUCAO
+No cenário atual da análise estatística, a utilização de ferramentas computacionais é fundamental para explo- rar, analisar e interpretar conjuntos de dados. Neste contexto, a linguagem de programação R destaca-se como uma ferramenta extremamente útil, ao oferecer uma enorme variedade de recursos, de modo a facilitar a rea- lização de análises estatísticas.
+-->
+
+<!--
+A realização deste trabalho deu-nos a oportunidade de explorar mais
+aprofundadamente a linguagem de programação R, principalmente no contexto da
+análise de variâncias e na estimação de modelos de regressão linear múltipla.
+Para além disso, conseguimos aprofundar a nossa compreensão estatística e a
+habilidade de interpretar resultados, sejam eles gráficos ou numéricos.
+
+$\ $
+
+Em suma, este trabalho não desenvolveu apenas as nossas habilidades técnicas
+em R, mas também as nossas habilidades dentro da área da análise estatística.
+-->
+
+<!--
+bla bla \cite{HP10} e \cite{KA03}.
+\bibliographystyle{apalike}
+\bibliography{refs}
+\addcontentsline{toc}{section}{Bibliografia}
+-->
