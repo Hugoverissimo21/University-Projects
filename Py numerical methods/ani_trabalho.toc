@@ -1,0 +1,18 @@
+\babel@toc {portuges}{}\relax 
+\contentsline {section}{Índice}{2}{Doc-Start}%
+\contentsline {section}{\numberline {1}Introdução}{3}{section.1}%
+\contentsline {section}{\numberline {2}Decomposição QR}{4}{section.2}%
+\contentsline {subsection}{\numberline {2.1}Processo de Ortonormalização de Gram-Schmidt}{4}{subsection.2.1}%
+\contentsline {subsection}{\numberline {2.2}Algoritmo de Gram-Schmidt Clássico}{4}{subsection.2.2}%
+\contentsline {subsubsection}{\numberline {2.2.1}Implementação em Python}{5}{subsubsection.2.2.1}%
+\contentsline {subsection}{\numberline {2.3}Regressão Exponencial}{6}{subsection.2.3}%
+\contentsline {subsubsection}{\numberline {2.3.1}Linearização do Problema}{6}{subsubsection.2.3.1}%
+\contentsline {subsubsection}{\numberline {2.3.2}Resolução do Problema}{6}{subsubsection.2.3.2}%
+\contentsline {subsubsection}{\numberline {2.3.3}Exemplo - Regressão Exponencial: Problema Linearizado (QR)}{6}{subsubsection.2.3.3}%
+\contentsline {section}{\numberline {3}Método de Levenberg-Marquardt}{9}{section.3}%
+\contentsline {subsection}{\numberline {3.1}Implementação em Python}{11}{subsection.3.1}%
+\contentsline {subsubsection}{\numberline {3.1.1}Exemplo - Regressão Exponencial: Problema Não Linear (LM)}{12}{subsubsection.3.1.1}%
+\contentsline {subsection}{\numberline {3.2}Escolha da aproximação inicial}{13}{subsection.3.2}%
+\contentsline {subsection}{\numberline {3.3}Escolha do parâmetro $\mu $}{14}{subsection.3.3}%
+\contentsline {section}{\numberline {4}Conclusão}{16}{section.4}%
+\contentsline {section}{Referências}{18}{section.4}%
