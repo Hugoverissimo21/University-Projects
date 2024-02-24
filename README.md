@@ -1,13 +1,14 @@
 Here, you can find some projects I completed at university.
 
-1) [Numerical Methods using Python](https://hugoverissimo21.github.io/University-Projects/Py%20-%20numerical%20methods.pdf)
+1) [Decomposição QR e Algoritmo LM](https://hugoverissimo21.github.io/University-Projects/Decomposição%20QR%20e%20Algoritmo%20LM/ani_trabalho.pdf) ([Slides](https://hugoverissimo21.github.io/University-Projects/Decomposição%20QR%20e%20Algoritmo%20LM/ani_quarto.html#/title-slide))
   
     -   QR Decomposition & Levenberg-Marquardt Method
     -   Comparative Analysis: Observed vs Estimated Data Graphics
     -   Topographic Map Aligned with Levenberg-Marquardt Parameters
     -   Matrix-Based System Solving
+    -   
 
-2) [Fundamental Data Analysis using R](https://hugoverissimo21.github.io/University-Projects/R%20-%20fundamental%20data%20analysis.pdf)
+2) [Relatório de Análise de Variância e Regressão Linear Múltipla](https://hugoverissimo21.github.io/University-Projects/Relatório%20de%20Análise%20de%20Variância%20e%20Regressão%20Linear%20Múltipla/AEII_main.pdf)
 
     - Data Cleansing and Dataframe Manipulation
     - Assumption Verification (Normality, Homogeneity, ...)
