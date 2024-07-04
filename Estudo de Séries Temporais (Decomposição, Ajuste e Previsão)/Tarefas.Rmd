@@ -1,0 +1,644 @@
+---
+title: "Modelação e Previsão de Séries Temporais"
+author: "Tarefas"
+date: "2023/2024"
+output: 
+  pdf_document:
+    fig_height: 3
+    fig_width: 5
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+load("~/Desktop/console.RData")
+
+# ```{r, fig.align="center", fig.height=3, fig.width=6}
+# ```{r, warning = FALSE}
+
+library(fpp2)
+library(ggplot2)
+library(forecast)
+library(expsmooth)
+library(fma)
+library(dplyr)
+
+test.Outliers.STL <- function (x)
+{
+  stlR <- stl(x, s.window = "per", robust = TRUE)
+  iO <- which(stlR$weights < 1e-08)
+  out <- ifelse(length(iO) == 0, FALSE, TRUE)
+  return (out)
+}
+
+stl.fit <- function(y,rob,k){
+  nextodd <- function(x){
+    x <- round(x)
+    if (x%%2 == 0) 
+      x <- x + 1
+    as.integer(x)
+  }
+  aux <- c()
+  fit <- stl(y, s.window = "periodic", robust = rob)
+  fit2 <- fit$time.series[,"seasonal"] + fit$time.series[,"trend"]
+  m1 <- accuracy(fit2,y)[k] 
+  aux$measure <- m1
+  aux$stl <- fit
+  len <- min(5*frequency(y), length(y))
+  i_range <- seq(7,len,2)
+  for (i in i_range){
+    t.win <- nextodd(ceiling(1.5*frequency(y)/(1-1.5/i)))
+    kk_range <- seq(t.win,len,2)
+    for (kk in kk_range){
+      for (t in 0:1){
+        for (w in 0:1){
+          fit <- stl(y,
+                     s.window = i,
+                     t.window = kk,
+                     s.degree = t,
+                     t.degree = w,
+                     robust=rob)
+          fit2 <- fit$time.series[,"seasonal"] + fit$time.series[,"trend"]
+          m2 <- accuracy(fit2,y)[k] 
+          if (m2 < m1){
+            m1 <- m2
+            aux$measure <- m1
+            aux$stl <- fit
+          }
+        }
+      }
+    }
+  }
+  aux
+}
+```
+
+**Nota:** Algumas justificações e códigos podem parecer confusos ou desorganizados, pois cada tarefa foi realizada em momentos diferentes. Além disso, cada tarefa foi aplicada em simultâneo a cinco países diferentes, e não a um único país, ao contrário do que se verifica neste documento.
+
+$\ $
+
+
+## Dados fornecidos
+
+Recolhidos do site do Eurostat, referentes ao consumo mensal de eletricidade nos países da UE.
+
+
+```{r}
+head(eu_countries, 5)
+head(data.tsb, 5)
+```
+
+$\ $
+
+## Seleção e tratamento dos dados
+
+```{r}
+PT.data <- data.tsb |>
+  filter(geo == "PT") |>
+  select(-geo)
+
+PT.ts <- ts(PT.data$values, start=c(2008,1), frequency=12)
+```
+
+\newpage
+
+\vspace*{\fill}
+\begin{center}
+\LARGE \textbf{Tarefa 1 de 4} \end{center}
+\vspace*{\fill}
+
+\newpage
+
+## Q1: Representação gráfica da série temporal
+
+```{r, fig.align="center", fig.height=3, fig.width=6}
+autoplot(PT.ts) + xlab("tempo") +
+  ylab("consumo de eletricidade (kW)") +
+  ggtitle("consumo de eletricidade em PT")
+```
+
+Quanto a Portugal, até por volta de 2013 observa-se uma tendência crescente não muito significativa, por volta de 2013 observa-se um aumento signifivativo do consumo de eletricidade, e que a partir daí parece haver uma estabilização e ligeiro descréscimo, ao longo do tempo, do consumo de eletricidade. Para além disso também se observa sazonalidade, uma queda por volta de 2020, tal como os outros países, e ainda uma outra queda à volta de 2022.
+
+## Q2: Evolução da componente sazonal ao longo dos anos (graficamente)
+
+```{r}
+ggsubseriesplot(PT.ts)
+```
+
+```{r}
+ggseasonplot(PT.ts)
+```
+
+
+Atendendo a Portugal, através do primeiro gráfico observa-se que, em média, em janeiro atingimos o maior consumo de eletricidade e em abril o menor. De janeiro para fevereiro há uma queda, março sobe ligeiramente, abril volta a descer matendo o nível até junho. Julho tem um aumento do consumo de eletrecidade, mas agosto tem uma queda voltando o nível de consumo de eletrecidade a estar, em média, ligeiramente acima do nível de abril/maio/junho. Este nível vai aumentando ligeiramente até novembro, tendo uma subida mais signficativa em dezembro. Através do segundo gráfico é mais notório a diferença dos consumos entre os anos, mas não sendo isto necessário para esta questão.
+
+
+## Q3: Decomposição clássica aditiva e multiplicativa
+
+```{r}
+PT.dec.adt <- decompose(PT.ts, type="additive")
+PT.dec.mul <- decompose(PT.ts, type="multiplicative")
+```
+
+
+## Q4: Indíces sazonais
+
+```{r}
+round(PT.dec.adt$figure, 2)
+round(PT.dec.mul$figure, 2)
+```
+
+Quanto a Portugal, observa-se que o mês com maior e menor consumo são janeiro e abril, respetivamente. Pela decomposição aditiva observa-se que o valor em janeiro é superior à média em 542 kW e o de abril é inferior em 265 kW. Pela dec. multiplicativa observa-se que janeiro tem um acréscimo de 14% em relação à média e abril um decréscimo de 7%. Isto está em concordância com a análise efetuada na questão 2.
+
+
+## Q5: Transformação necessária? (BoxCox)
+
+```{r}
+#autoplot(PT.ts)
+BoxCox.lambda(PT.ts)
+```
+
+Uma tranformação nesta série temporal seria importante se fosse possível suavizar o aumento repentino que surge à volta de 2013 e também suavizar os picos da sazonalidade ao longo dos anos que possam estar a originar outliers, como parece acontecer em vários anos, tais como à volta de 2015, 2020 e 2021. O lamba é próximo de 1, o que não sugere grande transformação, mas seria interessante analisar.
+
+## Q6: Decomposição de Loess
+
+```{r}
+test.Outliers.STL(PT.ts)
+```
+
+A presença de outliers implica o uso de decomposições robustas (`robust = TRUE`)
+
+```{r}
+PT.dec.stl1 <- stl(PT.ts, s.window = "periodic", robust = TRUE)
+PT.dec.stl7 <- stl(PT.ts, s.window = 7, robust = TRUE)
+PT.dec.stl20 <- stl(PT.ts, s.window = 20, robust = TRUE)
+```
+
+
+## Q7: Representação gráfica das séries ajustadas
+
+
+```{r, warning = FALSE}
+serie <- PT.ts
+autoplot(serie) + 
+  autolayer(serie - PT.dec.adt$random, series="adt") +
+  autolayer(serie / PT.dec.mul$random, series="mul") +
+  autolayer(serie - PT.dec.stl1$time.series[, "remainder"], series="per") +
+  autolayer(serie - PT.dec.stl7$time.series[, "remainder"], series="7") +
+  autolayer(serie - PT.dec.stl20$time.series[, "remainder"], series="20")
+```
+
+
+## Q8: Medidas de erro para cada decomposição
+
+
+```{r}
+serie <- PT.ts
+accuracy(serie - PT.dec.adt$random, PT.ts)[,c("ME","RMSE","MAE")]
+accuracy(serie / PT.dec.mul$random, PT.ts)[,c("ME","RMSE","MAE")]
+accuracy(serie - PT.dec.stl1$time.series[, "remainder"], PT.ts)[,c("ME","RMSE","MAE")]
+accuracy(serie - PT.dec.stl7$time.series[, "remainder"], PT.ts)[,c("ME","RMSE","MAE")]
+accuracy(serie - PT.dec.stl20$time.series[, "remainder"], PT.ts)[,c("ME","RMSE","MAE")]
+```
+
+O melhor método de decomposição para Portugal é: decomposição clássica multiplicativa. Contudo, esta decomposição está bastante próxima dos valores da aditiva pelo que ambos os modelos serão bastante bons.
+
+
+## Q9: Melhor ajustamento face aos dados reais
+
+```{r}
+autoplot(PT.ts, series="Portugal") +
+  autolayer(PT.ts / PT.dec.mul$random, series="dec.mul")
+```
+
+\newpage
+
+\vspace*{\fill}
+\begin{center}
+\LARGE \textbf{Tarefa 2 de 4} \end{center}
+\vspace*{\fill}
+
+\newpage
+
+
+## Pré-requisitos
+
+**Definição de variáveis**
+
+```{r}
+PT.train <- window(PT.ts, end = c(2022, 12))
+PT.test <- window(PT.ts, start = c(2023, 1))
+```
+
+**Melhor decomposição**
+
+Utilizei a decomposição clássica (aditiva e multiplicativa), decomposição de Loess (`s.window` igual a "periodic", 7, 15, 20) e a função `stl.fit`.
+
+```{.r}
+tseries <- PT.train
+
+# clássica
+accuracy(tseries - decompose(tseries, type = "additive")$random, tseries)
+accuracy(tseries / decompose(tseries, type = "multiplicative")$random, tseries)
+
+# Loess
+accuracy(tseries - remainder(stl(tseries, s.window = ...,
+                                 robust = test.Outliers.STL(tseries))), tseries)
+
+# stl.fit
+accuracy(tseries - remainder(stl.fit(tseries, k = 2,
+                                     rob = test.Outliers.STL(tseries))$stl), tseries)
+```
+
+\begin{tabular}{c|cc|cccc|c}
+  Decomposição & adt & mul & stlper & stl7 & stl15 & stl20 & stl.fit \\
+  \hline
+  PT.train & 139.503 & 139.355 & 142.7396 & 157.1439 & 146.3441 & 145.8309 & 140.1014
+\end{tabular}
+
+$\ $
+
+```{r}
+PT.dec.classic.mul <- decompose(PT.train, type = "multiplicative")
+PT.dec.stl <- stl(PT.train, s.window = "periodic", robust = test.Outliers.STL(PT.train))
+PT.dec.stlfit <- stl.fit(PT.train, k = 2, rob = test.Outliers.STL(PT.train))$stl
+```
+
+
+## Q1: Previsões através de métodos simples
+
+```{r}
+n <- length(PT.test)
+PT.train.prev.snaive <- snaive(PT.train, h=n)
+PT.train.prev.drift <- rwf(PT.train, drift=TRUE, h=n)
+
+autoplot(PT.test) + autolayer(PT.train.prev.snaive$mean) + autolayer(PT.train.prev.drift$mean)
+```
+
+Os dados iniciais apresentavam tendência e sazonalidade, daí a escolha destas duas previsões.
+
+## Q2: Previsões a partir da decomposição clássica
+
+```{r}
+tserie.test <- PT.test
+n <- length(tserie.test)
+dec <- PT.dec.classic.mul
+
+A.drift <- rwf(seasadj(dec), drift = TRUE, h=n)$mean
+A.meanf <- meanf(seasadj(dec), h=n)$mean
+A.naive <- naive(seasadj(dec), h=n)$mean
+S <- snaive(seasonal(dec), h = n)$mean
+
+AS.sdrift <- A.drift * S
+accuracy(AS.sdrift,tserie.test)[,"RMSE"]
+AS.smeanf <- A.meanf * S
+accuracy(AS.smeanf,tserie.test)[,"RMSE"]
+AS.snaive <- A.naive * S
+accuracy(AS.snaive,tserie.test)[,"RMSE"]
+
+
+#autoplot(tserie.test) + autolayer(AS.sdrift) + autolayer(AS.smeanf) + autolayer(AS.snaive)
+
+PT.classic.prev <- A.drift * S
+```
+
+PT, com decomposição clássica - snaive (para a componente sazonal) * drift (para a componente sem sazonalidade) é a melhor previsão
+
+## Q3: Previsões a partir da decomposição de Loess
+
+```{r}
+tserie.test <- PT.test
+n <- length(tserie.test)
+dec <- PT.dec.stl
+
+A.drift <- rwf(seasadj(dec), drift = TRUE, h=n)$mean
+A.meanf <- meanf(seasadj(dec), h=n)$mean
+A.naive <- naive(seasadj(dec), h=n)$mean
+S <- snaive(seasonal(dec), h = n)$mean
+
+AS.sdrift <- A.drift + S
+accuracy(AS.sdrift,tserie.test)[,"RMSE"]
+AS.smeanf <- A.meanf + S
+accuracy(AS.smeanf,tserie.test)[,"RMSE"]
+AS.snaive <- A.naive + S
+accuracy(AS.snaive,tserie.test)[,"RMSE"]
+
+
+#autoplot(tserie.test) + autolayer(AS.sdrift) + autolayer(AS.smeanf) + autolayer(AS.snaive)
+
+PT.stl.prev <- A.drift + S
+```
+
+PT, com decomposição de Loess - drift + snaive ....
+
+
+## Q4: Previsões a partir do uso da função stl.fit
+
+```{r}
+tserie.test <- PT.test
+n <- length(tserie.test)
+dec <- PT.dec.stlfit
+
+A.drift <- rwf(seasadj(dec), drift = TRUE, h=n)$mean
+A.meanf <- meanf(seasadj(dec), h=n)$mean
+A.naive <- naive(seasadj(dec), h=n)$mean
+S <- snaive(seasonal(dec), h = n)$mean
+
+AS.sdrift <- A.drift + S
+accuracy(AS.sdrift,tserie.test)[,"RMSE"]
+AS.smeanf <- A.meanf + S
+accuracy(AS.smeanf,tserie.test)[,"RMSE"]
+AS.snaive <- A.naive + S
+accuracy(AS.snaive,tserie.test)[,"RMSE"]
+
+
+#autoplot(tserie.test) + autolayer(AS.sdrift) + autolayer(AS.smeanf) + autolayer(AS.snaive)
+
+PT.stlfit.prev <- A.drift + S
+```
+
+PT, com a decomposição através da função `stl.fit` - snaive + drift ....
+
+
+## Q5 e Q6: Transformação BoxCox 
+
+```{r}
+PT.lam <- BoxCox.lambda(PT.train)
+PT.transf <- BoxCox(PT.train, lambda = PT.lam)
+```
+
+## Q7: Previsões simples a partir da transf. BoxCox
+
+```{r}
+#autoplot(PT.transf)
+
+n <- length(PT.test)
+PT.transf.prev.snaive <- snaive(PT.transf , h = n)$mean
+
+PT.box.prev.snaive <- InvBoxCox(PT.transf.prev.snaive, lambda = PT.lam)
+
+autoplot(PT.test) + autolayer(PT.box.prev.snaive)
+```
+
+É importante referir que todos os gráficos apresentaram tendência nula ou de baixa significância, mas uma sazonalidade bem significativa, daí ter usado sempre o método snaive de forma a prever os dados de teste.
+
+
+## Q8: Representação gráfica das previsões obtidas
+
+
+```{r}
+autoplot(PT.test, series="data") +
+  autolayer(PT.train.prev.snaive$mean) + autolayer(PT.train.prev.drift$mean) +
+  autolayer(PT.classic.prev) +
+  autolayer(PT.stl.prev) +
+  autolayer(PT.stlfit.prev) +
+  autolayer(PT.box.prev.snaive)
+```
+
+## Q9: Qualidade das previsões
+
+```{r}
+ttest <- PT.test
+
+accuracy(PT.train.prev.snaive$mean , ttest)[,"RMSE"]
+accuracy(PT.train.prev.drift$mean , ttest)[,"RMSE"]
+accuracy(PT.classic.prev , ttest)[,"RMSE"]
+accuracy(PT.stl.prev , ttest)[,"RMSE"]
+accuracy(PT.stlfit.prev , ttest)[,"RMSE"]
+accuracy(PT.box.prev.snaive , ttest)[,"RMSE"]
+```
+
+PT - PT.train.prev.snaive & PT.box.prev.snaive são as melhores
+
+
+## Q10: Transformar ou não transformar? (BoxCox)
+
+Tendo em conta a alínea anterior, as transformações `BoxCox` utilizadas não obteram as melhores previsões com exceção no caso dos dados de Portugal, mas ainda assim ficou em empatado com a previsão simples `snaive`.
+
+Pode-se observar que há exceção de Portugal, as melhores previsões foram obtidas a partir de aplicações às decomposições `stl` (Loess e `stl.fit`).
+
+\newpage
+
+\vspace*{\fill}
+\begin{center}
+\LARGE \textbf{Tarefa 3 de 4} \end{center}
+\vspace*{\fill}
+
+\newpage
+
+## Pré-Requisitos
+
+**Definição das variáveis de treino e de teste**
+
+```{r}
+PT.train <- window(PT.ts, end = c(2022, 12))
+PT.test <- window(PT.ts, start = c(2023, 1))
+```
+
+**Encontrar as melhores decomposições utilizando a medida RMSE**
+
+\begin{tabular}{c|cc|cccc|c||c}
+  Decomposição & adt & mul & stlper & stl7 & stl15 & stl20 & stl.fit & \\
+  \hline
+  PT.train & 139.503 & 139.355 & 142.7396 & 157.1439 & 146.3441 & 145.8309 & 140.1014 & mul
+\end{tabular}
+
+$\ $
+
+```{r}
+PT.dec.mul <- decompose(PT.train, type = "multiplicative")
+```
+
+**Definir os melhores ajustamentos**
+
+```{r}
+PT.fitT2 <- seasonal(PT.dec.mul) * trendcycle(PT.dec.mul)
+```
+
+**Em que países (--.train) deve ser usado BoxCox?**
+
+Nenhuma das séries parece beneficiar significativamente de uma transformação BoxCox, com exceção de Portugal. Pelo facto da sua melhor decomposição ser multiplicativa é importante aplicar esta transformação caso se realize uma decomposição aditiva, por exemplo `stl`.
+
+
+## Q1: Modelo ets, com o critério aic
+
+```{r}
+PT.dec.ets <- ets(PT.train, ic="aic")
+```
+
+## Q2: Obter as previsões a partir do modelo ets
+
+```{r}
+PT.prev.ets <- forecast(PT.dec.ets, h = length(PT.test))
+```
+
+## Q3: Previsões a partir da funcção stlf
+
+```{r}
+PT.stlf <- stlf(PT.train, h = length(PT.test), lambda = "auto")
+```
+
+Utilizei unicamente a transformação BoxCox na previsão de Portugal pelas razões indicadas nos Pré-Requisitos.
+
+## Q4: Qualidade das previsões (ets vs stlf)
+
+```{r}
+autoplot(PT.test) + autolayer(PT.prev.ets$mean) + autolayer(PT.stlf$mean)
+
+t(data.frame(ets = accuracy(PT.prev.ets$mean, PT.test)[,"RMSE"],
+             stlf = accuracy(PT.stlf$mean, PT.test)[,"RMSE"]))
+```
+
+No caso de Portugal, pela primeira vez, a função `ets` + `forecast` produziu a melhor previsão. Pergunto-me se terá sido pelo facto de ter sido utilizado uma transformação BoxCox na previsão com a função `stlf`.
+
+Assim sendo vou verificar a qualidade da previsão caso a mesma fosse realizada sem a transformação:
+
+```{r}
+accuracy(stlf(PT.train, h = length(PT.test))$mean,
+         PT.test)[,"RMSE"]
+```
+
+Verifica-se que de qualquer forma, no caso de Portugal, a função `stlf` não produz as melhores previsões.
+
+## Q5: Comparar os resultados com a tarefa anterior
+
+Selecionando os resultados obtidos na Tarefa 2, questão 9:
+
+```{r}
+PT.T2.train.prev.snaive <- 142.1451
+```
+
+$\ $
+
+```{r}
+t(data.frame(ets = accuracy(PT.prev.ets$mean, PT.test)[,"RMSE"],
+             T2 = PT.T2.train.prev.snaive))
+```
+
+No caso de Portugal, as melhores previsões foram obtidas através da aplicação da decomposicão `ETS` aos dados de treino, com o modelo ETS(A,A,A), e posterior utilização da função `forecast` para realizar as previsões.
+
+
+\newpage
+
+\vspace*{\fill}
+\begin{center}
+\LARGE \textbf{Tarefa 4 de 4} \end{center}
+\vspace*{\fill}
+
+\newpage
+
+## Pré-Requisitos
+
+**Melhores previsões para cada país das tarefas anteriores**
+
+- No caso de **Portugal**, as melhores previsões foram obtidas através da aplicação da decomposicão ETS aos dados de treino, com o modelo ETS(A,A,A), e posterior utilização da função forecast para realizar as previsões (Tarefa 3). [RMSE = 127.7184]
+
+$\ $
+
+```{r}
+PT.T3.prev.ets <- 127.7184
+```
+
+**T3, Q1: decomposição ets para cada país**
+
+```{r}
+PT.dec.ets <- ets(PT.train, ic="aic")
+```
+
+**T3, Q2: previsões a partir do ets para cada país**
+
+```{r}
+PT.prev.ets <- forecast(PT.dec.ets, h = length(PT.test))
+```
+
+
+## Q1: Ajustar um modelo ARIMA
+
+
+```{r}
+PT.ari <- auto.arima(PT.train, ic="aic")
+```
+
+
+```{r}
+PT.ari
+```
+
+Para a Portugal, o modelo ARIMA adequado, é na verdade um SARIMA, visto que os dados têm sazonalidade. Para além disso verifica-se que o modelo é ARIMA(1,0,1)(0,1,1)[12], ou seja, p = 1, d = 0, q = 1, P = 0, D = 1 e Q = 1.
+
+
+## Q2: Previsões a partir do modelo ARIMA
+
+
+```{r}
+PT.ari.prev <- forecast(PT.ari, h = length(PT.test))
+```
+
+
+```{r}
+autoplot(PT.test) + autolayer(PT.ari.prev$mean) + autolayer(PT.prev.ets$mean)
+```
+
+
+Mais uma vez, ambas as previsões bastante próximas dos dados de teste, mas desta vez é mais difícil visualmente escolher a candidata a ser a melhor previsão.
+
+
+
+## Q3: Melhor previsão
+
+
+```{r}
+accuracy(PT.ari.prev$mean, PT.test)[,c("RMSE", "MAE", "MAPE")]
+accuracy(PT.prev.ets$mean, PT.test)[,c("RMSE", "MAE", "MAPE")]
+```
+
+A partir das medidas de erro indicadas no enunciado, verifica-se, que no caso de portugal, as melhores previsões foram obtidas a partir da previsão com o modelo ARIMA do exercicio 1.
+
+
+## Q4: Previsões credíveis? (análise aos resíduos)
+
+Analisar os resíduos dos modelos que originaram as melhores previsões:
+
+```{r}
+checkresiduals(PT.ari)
+```
+
+Pelo facto dos residuos resultantes dos modelos que originaram as melhores previsoes serem todos white noise (nível de significância de 1%), com exceção da Polónia, é de esperar que as melhores previsões sejam crediveis para esses.
+
+## Q5: Melhor ajustamento
+
+
+```{r}
+accuracy(fitted(PT.ari), PT.train)[,c("RMSE", "MAE", "MAPE")]
+accuracy(fitted(PT.dec.ets), PT.train)[,c("RMSE", "MAE", "MAPE")]
+```
+
+No caso de Portugal, o melhor modelo ajustado é o modelo ARIMA (MAE e MAPE menores) (T4 Q1). O melhor modelo ajustado corresponde às melhores previsões.
+
+Repara-se que o melhor modelo ajustado, para estes países, foi sempre o modelo ARIMA, realizado na questão 1 desta tarefa. Contudo, também se repara que nem sempre o melhor modelo ajustado leva às melhores previsões.
+
+
+## Q6: Previsões para 2024, sem dados de teste
+
+Relembrando:
+
+País | melhor prev | melhor ajust
+
+PT | ari | ari
+
+vou ter por base as melhores previsões na escolha do modelo, contudo, no caso da Polónia, irei verificar se o modelo ARIMA produz residuos que sejam ruido branco e irei usar o mesmo.
+
+
+```{r}
+PT.ts.ari <- auto.arima(PT.ts, ic = "aic")
+#tail(PT.ts)
+PT.ts.prev <- forecast(PT.ts.ari, h = 12 + 1) #incluir DEZ23
+```
+
+
+```{r}
+(PT.24 <- window(PT.ts.prev$mean, start=c(2024,1), end = c(2024, 12)))
+autoplot(PT.24)
+```
+
+Atendendo ao consumo de eletrecidade em Portugal no ano de 2024, prevê-se que o mesmo atinja o seu máximo do ano em janeiro, provavelemnte devido ao inverno, uma descida nos meses seguintes até junho, havendo uma subida mais significativa em julho e por fim uma tendência de aumento ligeiro até ao final do ano.
+
