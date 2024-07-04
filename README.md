@@ -20,7 +20,7 @@ note: inside each folder there is a readme file which has a redicet/hyperlink to
     - Analysis of variance (ANOVA)
     - Linear regression: estimation, optimization and analysis
 
-3) [Estudo de Séries Temporais (Decomposição, Ajuste e Previsão)](https://github.com/Hugoverissimo21/University-Projects/tree/main/Estudo%20de%20Séries%20Temporais%20(Decomposição%2C%20Ajuste%20e%20Previsão))
+3) [Estudo de Séries Temporais (Decomposição, Ajuste e Previsão)](https://github.com/Hugoverissimo21/University-Projects/tree/main/Estudo%20de%20Séries%20Temporais%20(Decomposição%2C%20Ajuste%20e%20Previsão)) [R, for Time Series Modeling and Forecasting]
 
     - autoplot, stl, decompose, forecast, arima, checkresiduals, error measures
     - ...
