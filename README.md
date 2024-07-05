@@ -1,11 +1,6 @@
 Here, you can find some projects I completed at university.
 
-note: inside each folder there is a readme file which has a redicet/hyperlink to the main content? (report/slides)
-!!!!!!
-
-!!!!!!
-
-!!!!!!
+Note: Inside each folder, there is a README file that contains a redirect/hyperlink to the main content (report/slides).
 
 1) [Decomposição QR e Algoritmo LM](https://github.com/Hugoverissimo21/University-Projects/tree/main/Decomposição%20QR%20e%20Algoritmo%20LM) [Python, for Numerical Analysis I]
 
@@ -17,16 +12,14 @@ note: inside each folder there is a readme file which has a redicet/hyperlink to
 2) [Relatório de Análise de Variância e Regressão Linear Múltipla](https://github.com/Hugoverissimo21/University-Projects/tree/main/Relatório%20de%20Análise%20de%20Variância%20e%20Regressão%20Linear%20Múltipla) [R, for Statistical Analysis II]
 
     - Data cleaning and DataFrame manipulation
-    - Assumption verification (normality, homogeneity, ...)
+    - Assumption verification (normality, homogeneity, etc.)
     - Descriptive data analysis
     - Analysis of variance (ANOVA)
     - Linear regression: estimation, optimization and analysis
 
 3) [Estudo de Séries Temporais (Decomposição, Ajuste e Previsão)](https://github.com/Hugoverissimo21/University-Projects/tree/main/Estudo%20de%20Séries%20Temporais%20(Decomposição%2C%20Ajuste%20e%20Previsão)) [R, for Time Series Modeling and Forecasting]
 
-    - melhorar:
-    - ...
-    - análise gráfica de séries temporais (tendência e sazonalidade)
-    - decomposição classica, de loess (stl?), ets, e arimas ?
-    - previsão através de vários metodos (naive, drift, snaive, ...)
-    - medidaes de erro e verificacao de residuos
+    - Graphical analysis of time series (trend and seasonality)
+    - Classical decomposition, Loess decomposition, ETS, and ARIMA models
+    - Forecasting using various methods (naive, drift, seasonal naive, etc.)
+    - Error measurements and residual diagnostics
